@@ -1,5 +1,6 @@
 package fail.tiger.komgarot.ui.settings
 
+import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -14,6 +15,7 @@ import coil.annotation.ExperimentalCoilApi
 import coil.imageLoader
 import fail.tiger.komgarot.R
 import fail.tiger.komgarot.data.local.AuthPreferences
+import fail.tiger.komgarot.data.local.PreferencesManager
 import fail.tiger.komgarot.data.local.ReaderPageCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -21,7 +23,11 @@ import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalCoilApi::class)
 @Composable
-fun SettingsScreen(onBack: () -> Unit, prefs: AuthPreferences) {
+fun SettingsScreen(
+    onBack: () -> Unit,
+    prefs: AuthPreferences,
+    preferencesManager: PreferencesManager   // ✅ 新增参数
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var cacheSize by remember { mutableStateOf(CacheSizeUi.loading()) }
@@ -37,6 +43,9 @@ fun SettingsScreen(onBack: () -> Unit, prefs: AuthPreferences) {
     val appLockEnabled by prefs.appLockEnabled.collectAsState(initial = false)
     val appLockTimeout by prefs.appLockTimeout.collectAsState(initial = 0)
     var showLockTimeoutDialog by remember { mutableStateOf(false) }
+
+    // ✅ 离线模式状态
+    val offlineMode by preferencesManager.getOfflineModeFlow().collectAsState(initial = false)
 
     LaunchedEffect(Unit) {
         cacheSize = getCacheSize(context)
@@ -102,6 +111,41 @@ fun SettingsScreen(onBack: () -> Unit, prefs: AuthPreferences) {
                 modifier = Modifier.clickable { scope.launch { prefs.setKeepScreenOn(!keepScreenOn) } }
             )
             HorizontalDivider()
+
+            // ✅ 新增：离线模式开关
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.settings_offline_mode)) },
+                supportingContent = { Text(stringResource(R.string.settings_offline_mode_desc)) },
+                trailingContent = {
+                    Switch(
+                        checked = offlineMode,
+                        onCheckedChange = { enabled ->
+                            scope.launch {
+                                preferencesManager.setOfflineMode(enabled)
+                                Toast.makeText(
+                                    context,
+                                    if (enabled) "离线模式已启用，重启应用后生效"
+                                    else "在线模式已启用，重启应用后生效",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        }
+                    )
+                },
+                modifier = Modifier.clickable {
+                    scope.launch {
+                        val newValue = !offlineMode
+                        preferencesManager.setOfflineMode(newValue)
+                        Toast.makeText(
+                            context,
+                            if (newValue) "离线模式已启用，重启应用后生效"
+                            else "在线模式已启用，重启应用后生效",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+            )
+
             ListItem(
                 headlineContent = { Text(stringResource(R.string.settings_app_lock)) },
                 supportingContent = { Text(stringResource(R.string.settings_app_lock_desc)) },
@@ -131,6 +175,7 @@ fun SettingsScreen(onBack: () -> Unit, prefs: AuthPreferences) {
         }
     }
 
+    // 以下是原有的各种对话框（省略，保持不变）
     if (showLockTimeoutDialog) {
         var sliderValue by remember { mutableFloatStateOf(appLockTimeout.toFloat()) }
         AlertDialog(

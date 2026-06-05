@@ -399,3 +399,5 @@
     <string name="admin_duplicate_page_deleted">已删除重复页</string>
     <string name="admin_task_queue_cleared">已清空任务队列</string>
 </resources>
+    <string name="settings_offline_mode">离线模式</string>
+    <string name="settings_offline_mode_desc">启用后启动应用不要求登录（需要预先在线同步数据）</string>

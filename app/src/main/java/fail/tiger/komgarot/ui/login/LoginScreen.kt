@@ -16,7 +16,7 @@ import fail.tiger.komgarot.data.local.PreferencesManager
 import fail.tiger.komgarot.ui.navigation.Screen
 import kotlinx.coroutines.flow.collectAsState
 import kotlinx.coroutines.flow.first
-
+import androidx.navigation.compose.navigate
 @Composable
 fun LoginScreen(
     onSuccess: () -> Unit,

@@ -84,8 +84,8 @@ import fail.tiger.komgarot.ui.settings.SettingsScreen
 @Composable
 fun AppNavGraph(
     app: KomgarotApp,
-    offlineMode: Boolean = false,          // 新增：离线模式标志
-    startDestination: String? = null       // 新增：起始页路由，优先级高于内部逻辑
+    offlineMode: Boolean = false,
+    startDestination: String? = null
 ) {
     val navController = rememberNavController()
     val imageCacheInvalidator = remember(app) { ImageCacheInvalidator(app.applicationContext) }
@@ -95,12 +95,10 @@ fun AppNavGraph(
     val alwaysIncognito by app.authPreferences.alwaysIncognito.collectAsState(initial = false)
     val user by sessionVm.user.collectAsState()
 
-    // 确定最终起始页：外部指定优先，否则根据 serverUrl 判断
     val finalStartDest = startDestination ?: (if (serverUrl.isNotEmpty()) Screen.Library.route else Screen.Login.route)
 
     val scope = rememberCoroutineScope()
 
-    // 自动跳转逻辑：仅在非离线模式且 serverUrl 不为空时触发
     LaunchedEffect(serverUrl, offlineMode) {
         if (!offlineMode && serverUrl.isNotEmpty() && navController.currentDestination?.route != Screen.Library.route) {
             sessionVm.refresh()
@@ -181,7 +179,7 @@ fun AppNavGraph(
     ) { shellModifier ->
         NavHost(
             navController = navController,
-            startDestination = finalStartDest,   // 使用计算出的起始页
+            startDestination = finalStartDest,
             modifier = shellModifier.fillMaxSize().background(MaterialTheme.colorScheme.surface),
             enterTransition = {
                 materialSharedAxisX(forward = true, slideDistance = slideDistance).targetContentEnter
@@ -196,300 +194,396 @@ fun AppNavGraph(
                 materialSharedAxisX(forward = false, slideDistance = slideDistance).initialContentExit
             }
         ) {
-        composable(Screen.Login.route) {
-            val vm: LoginViewModel = viewModel(factory = LoginViewModel.Factory(app.authRepository, textProvider))
-            LoginScreen(
-                onSuccess = {},
-                vm = vm,
-                preferencesManager = app.preferencesManager   // 需要传入，下面会说明
-            )
-        }
+            composable(Screen.Login.route) {
+                val vm: LoginViewModel = viewModel(factory = LoginViewModel.Factory(app.authRepository, textProvider))
+                LoginScreen(
+                    onSuccess = {},
+                    vm = vm,
+                    preferencesManager = app.preferencesManager
+                )
+            }
 
-        composable(Screen.Library.route) {
-            val vm: LibraryViewModel = viewModel(
-                factory = LibraryViewModel.Factory(app.libraryRepository, app.authRepository, textProvider)
-            )
-            LibraryScreen(
-                onLibraryClick = { navController.navigate(Screen.Series.go(it)) },
-                onBookClick = { book ->
-                    navController.navigate(
-                        Screen.BookDetail.go(
-                            book.id,
-                            book.metadata.title.ifEmpty { book.name },
-                            book.seriesTitle.orEmpty(),
-                            book.media.pagesCount,
-                            book.oneshot
+            composable(Screen.Library.route) {
+                val vm: LibraryViewModel = viewModel(
+                    factory = LibraryViewModel.Factory(app.libraryRepository, app.authRepository, textProvider)
+                )
+                LibraryScreen(
+                    onLibraryClick = { navController.navigate(Screen.Series.go(it)) },
+                    onBookClick = { book ->
+                        navController.navigate(
+                            Screen.BookDetail.go(
+                                book.id,
+                                book.metadata.title.ifEmpty { book.name },
+                                book.seriesTitle.orEmpty(),
+                                book.media.pagesCount,
+                                book.oneshot
+                            )
                         )
-                    )
-                },
-                onSeriesClick = openSeries,
-                serverUrl = serverUrl,
-                onLogout = {
-                    navController.navigate(Screen.Login.route) {
-                        popUpTo(0) { inclusive = true }
-                    }
-                },
-                onSettings = { navigateTopLevel(Screen.Settings.route) },
-                onBottomBarVisibleChange = { bottomBarVisible = it },
-                vm = vm
-            )
-        }
-
-        composable(Screen.Browse.route) {
-            val vm: SeriesViewModel = viewModel(
-                factory = SeriesViewModel.Factory(
-                    app.seriesRepository,
-                    SharedPreferencesSeriesSortStore(app.applicationContext),
-                    textProvider
+                    },
+                    onSeriesClick = openSeries,
+                    serverUrl = serverUrl,
+                    onLogout = {
+                        navController.navigate(Screen.Login.route) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    },
+                    onSettings = { navigateTopLevel(Screen.Settings.route) },
+                    onBottomBarVisibleChange = { bottomBarVisible = it },
+                    vm = vm
                 )
-            )
-            SeriesScreen(
-                libraryId = null,
-                serverUrl = serverUrl,
-                onSeriesClick = openSeries,
-                onMetadataClick = { navController.navigate(Screen.Metadata.go("series", it)) },
-                onBack = { navController.navigate(Screen.Library.route) },
-                vm = vm,
-                onBottomBarVisibleChange = { bottomBarVisible = it }
-            )
-        }
+            }
 
-        composable(Screen.Collections.route) {
-            val vm: CollectionViewModel = viewModel(factory = CollectionViewModel.Factory(app.collectionRepository, textProvider))
-            CollectionScreen(
-                serverUrl = serverUrl,
-                vm = vm,
-                onCollectionClick = { navController.navigate(Screen.CollectionDetail.go(it)) },
-                onBack = { navController.navigate(Screen.Library.route) },
-                onBottomBarVisibleChange = { bottomBarVisible = it }
-            )
-        }
+            composable(Screen.Browse.route) {
+                val vm: SeriesViewModel = viewModel(
+                    factory = SeriesViewModel.Factory(
+                        app.seriesRepository,
+                        SharedPreferencesSeriesSortStore(app.applicationContext),
+                        textProvider
+                    )
+                )
+                SeriesScreen(
+                    libraryId = null,
+                    serverUrl = serverUrl,
+                    onSeriesClick = openSeries,
+                    onMetadataClick = { navController.navigate(Screen.Metadata.go("series", it)) },
+                    onBack = { navController.navigate(Screen.Library.route) },
+                    vm = vm,
+                    onBottomBarVisibleChange = { bottomBarVisible = it }
+                )
+            }
 
-        composable(
-            Screen.CollectionDetail.route,
-            arguments = listOf(navArgument("collectionId") { type = NavType.StringType })
-        ) { back ->
-            val collectionId = back.arguments?.getString("collectionId")?.let { Screen.decodeArg(it) } ?: return@composable
-            val vm: CollectionViewModel = viewModel(factory = CollectionViewModel.Factory(app.collectionRepository, textProvider))
-            CollectionDetailScreen(
-                collectionId = collectionId,
-                serverUrl = serverUrl,
-                vm = vm,
-                onSeriesClick = openSeries,
-                onBack = { navController.popBackStack() }
-            )
-        }
+            composable(Screen.Collections.route) {
+                val vm: CollectionViewModel = viewModel(factory = CollectionViewModel.Factory(app.collectionRepository, textProvider))
+                CollectionScreen(
+                    serverUrl = serverUrl,
+                    vm = vm,
+                    onCollectionClick = { navController.navigate(Screen.CollectionDetail.go(it)) },
+                    onBack = { navController.navigate(Screen.Library.route) },
+                    onBottomBarVisibleChange = { bottomBarVisible = it }
+                )
+            }
 
-        composable(Screen.ReadLists.route) {
-            val vm: ReadListViewModel = viewModel(factory = ReadListViewModel.Factory(app.readListRepository, textProvider))
-            ReadListScreen(
-                serverUrl = serverUrl,
-                vm = vm,
-                onReadListClick = { navController.navigate(Screen.ReadListDetail.go(it)) },
-                onBack = { navController.navigate(Screen.Library.route) },
-                onBottomBarVisibleChange = { bottomBarVisible = it }
-            )
-        }
+            composable(
+                Screen.CollectionDetail.route,
+                arguments = listOf(navArgument("collectionId") { type = NavType.StringType })
+            ) { back ->
+                val collectionId = back.arguments?.getString("collectionId")?.let { Screen.decodeArg(it) } ?: return@composable
+                val vm: CollectionViewModel = viewModel(factory = CollectionViewModel.Factory(app.collectionRepository, textProvider))
+                CollectionDetailScreen(
+                    collectionId = collectionId,
+                    serverUrl = serverUrl,
+                    vm = vm,
+                    onSeriesClick = openSeries,
+                    onBack = { navController.popBackStack() }
+                )
+            }
 
-        composable(
-            Screen.ReadListDetail.route,
-            arguments = listOf(navArgument("readListId") { type = NavType.StringType })
-        ) { back ->
-            val readListId = back.arguments?.getString("readListId")?.let { Screen.decodeArg(it) } ?: return@composable
-            val vm: ReadListViewModel = viewModel(factory = ReadListViewModel.Factory(app.readListRepository, textProvider))
-            ReadListDetailScreen(
-                readListId = readListId,
-                serverUrl = serverUrl,
-                vm = vm,
-                onBookClick = { book ->
-                    navController.navigate(
-                        Screen.BookDetail.go(
-                            book.id,
-                            book.metadata.title.ifEmpty { book.name },
-                            book.seriesTitle.orEmpty(),
-                            book.media.pagesCount,
-                            book.oneshot
+            composable(Screen.ReadLists.route) {
+                val vm: ReadListViewModel = viewModel(factory = ReadListViewModel.Factory(app.readListRepository, textProvider))
+                ReadListScreen(
+                    serverUrl = serverUrl,
+                    vm = vm,
+                    onReadListClick = { navController.navigate(Screen.ReadListDetail.go(it)) },
+                    onBack = { navController.navigate(Screen.Library.route) },
+                    onBottomBarVisibleChange = { bottomBarVisible = it }
+                )
+            }
+
+            composable(
+                Screen.ReadListDetail.route,
+                arguments = listOf(navArgument("readListId") { type = NavType.StringType })
+            ) { back ->
+                val readListId = back.arguments?.getString("readListId")?.let { Screen.decodeArg(it) } ?: return@composable
+                val vm: ReadListViewModel = viewModel(factory = ReadListViewModel.Factory(app.readListRepository, textProvider))
+                ReadListDetailScreen(
+                    readListId = readListId,
+                    serverUrl = serverUrl,
+                    vm = vm,
+                    onBookClick = { book ->
+                        navController.navigate(
+                            Screen.BookDetail.go(
+                                book.id,
+                                book.metadata.title.ifEmpty { book.name },
+                                book.seriesTitle.orEmpty(),
+                                book.media.pagesCount,
+                                book.oneshot
+                            )
                         )
+                    },
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(Screen.Admin.route) {
+                val vm: AdminViewModel = viewModel(factory = AdminViewModel.Factory(app.adminRepository, textProvider))
+                AdminScreen(
+                    isAdmin = user?.isAdmin == true,
+                    vm = vm,
+                    onBack = { navController.navigate(Screen.Library.route) }
+                )
+            }
+
+            composable(
+                Screen.Series.route,
+                arguments = listOf(
+                    navArgument("libraryId") { type = NavType.StringType },
+                    navArgument("search") { type = NavType.StringType; nullable = true; defaultValue = null }
+                )
+            ) { back ->
+                val libraryId = back.arguments?.getString("libraryId")?.let { Screen.decodeArg(it) }?.takeIf { it != "all" }
+                val searchQuery = back.arguments?.getString("search")?.let { Screen.decodeArg(it) }
+                val vm: SeriesViewModel = viewModel(
+                    factory = SeriesViewModel.Factory(
+                        app.seriesRepository,
+                        SharedPreferencesSeriesSortStore(app.applicationContext),
+                        textProvider
                     )
-                },
-                onBack = { navController.popBackStack() }
-            )
-        }
-
-        composable(Screen.Admin.route) {
-            val vm: AdminViewModel = viewModel(factory = AdminViewModel.Factory(app.adminRepository, textProvider))
-            AdminScreen(
-                isAdmin = user?.isAdmin == true,
-                vm = vm,
-                onBack = { navController.navigate(Screen.Library.route) }
-            )
-        }
-
-        composable(
-            Screen.Series.route,
-            arguments = listOf(
-                navArgument("libraryId") { type = NavType.StringType },
-                navArgument("search") { type = NavType.StringType; nullable = true; defaultValue = null }
-            )
-        ) { back ->
-            val libraryId = back.arguments?.getString("libraryId")?.let { Screen.decodeArg(it) }?.takeIf { it != "all" }
-            val searchQuery = back.arguments?.getString("search")?.let { Screen.decodeArg(it) }
-            val vm: SeriesViewModel = viewModel(
-                factory = SeriesViewModel.Factory(
-                    app.seriesRepository,
-                    SharedPreferencesSeriesSortStore(app.applicationContext),
-                    textProvider
                 )
-            )
 
-            SeriesScreen(
-                libraryId = libraryId,
-                initialSearch = searchQuery,
-                serverUrl = serverUrl,
-                onSeriesClick = openSeries,
-                onMetadataClick = { navController.navigate(Screen.Metadata.go("series", it)) },
-                onBack = { navController.popBackStack() }, vm = vm
-            )
-        }
-
-        composable(
-            Screen.Books.route,
-            arguments = listOf(navArgument("seriesId") { type = NavType.StringType })
-        ) { back ->
-            val seriesId = back.arguments?.getString("seriesId")?.let { Screen.decodeArg(it) } ?: return@composable
-            val vm: BookViewModel = viewModel(
-                factory = BookViewModel.Factory(app.bookRepository, app.seriesRepository, imageCacheInvalidator, textProvider)
-            )
-            BookScreen(
-                seriesId = seriesId, serverUrl = serverUrl,
-                onBookClick = { id, name, pages, isOneShot ->
-                    navController.navigate(Screen.BookDetail.go(id, name, "", pages, isOneShot)) {
-                        launchSingleTop = true
-                    }
-                },
-                onMetadataClick = { navController.navigate(Screen.Metadata.go("series", it)) },
-                onBack = { navController.popBackStack() }, vm = vm
-            )
-        }
-
-        composable(
-            Screen.BookDetail.route,
-            arguments = listOf(
-                navArgument("bookId") { type = NavType.StringType },
-                navArgument("bookName") { type = NavType.StringType },
-                navArgument("seriesName") { type = NavType.StringType },
-                navArgument("pageCount") { type = NavType.IntType },
-                navArgument("isOneShot") { type = NavType.BoolType; defaultValue = false }
-            )
-        ) { back ->
-            val bookId = back.arguments?.getString("bookId")?.let { Screen.decodeArg(it) } ?: return@composable
-            val bookName = back.arguments?.getString("bookName")?.let { Screen.decodeArg(it) }.orEmpty()
-            val pageCount = back.arguments?.getInt("pageCount") ?: 0
-            val isOneShot = back.arguments?.getBoolean("isOneShot") ?: false
-            val vm: BookDetailViewModel = viewModel(
-                factory = BookDetailViewModel.Factory(
-                    app.bookRepository,
-                    app.seriesRepository,
-                    imageCacheInvalidator,
-                    textProvider
+                SeriesScreen(
+                    libraryId = libraryId,
+                    initialSearch = searchQuery,
+                    serverUrl = serverUrl,
+                    onSeriesClick = openSeries,
+                    onMetadataClick = { navController.navigate(Screen.Metadata.go("series", it)) },
+                    onBack = { navController.popBackStack() }, vm = vm
                 )
-            )
-            BookDetailScreen(
-                bookId = bookId,
-                bookName = bookName,
-                pageCount = pageCount,
-                isOneShot = isOneShot,
-                onBack = {
-                    if (isOneShot) {
-                        val popped = navController.popBackStack(Screen.Series.route, inclusive = false)
-                        if (!popped) navController.popBackStack()
-                    } else {
-                        navController.popBackStack()
-                    }
-                },
-                onReadClick = { id, trackProgress ->
-                    val effectiveTrack = trackProgress && !alwaysIncognito
-                    val startPage = if (effectiveTrack) vm.book?.readProgress?.page ?: 1 else 1
-                    navController.navigate(Screen.Reader.go(id, startPage, effectiveTrack))
-                },
-                onMetadataClick = { navController.navigate(Screen.Metadata.go("book", it)) },
-                onAuthorClick = { authorName, _ ->
-                    navController.navigate(Screen.Series.go(null, "author:$authorName"))
-                },
-                vm = vm,
-                prefs = app.authPreferences
-            )
-        }
+            }
 
-        composable(
-            Screen.Reader.route,
-            arguments = listOf(
-                navArgument("bookId") { type = NavType.StringType },
-                navArgument("page") { type = NavType.IntType; defaultValue = 1 },
-                navArgument("trackProgress") { type = NavType.BoolType; defaultValue = true }
-            ),
-            enterTransition = { fadeIn(tween(200)) },
-            exitTransition = { fadeOut(tween(150)) },
-            popEnterTransition = { fadeIn(tween(150)) },
-            popExitTransition = { fadeOut(tween(200)) }
-        ) { back ->
-            val bookId = back.arguments?.getString("bookId")?.let { Screen.decodeArg(it) } ?: return@composable
-            val page = back.arguments?.getInt("page") ?: 1
-            val trackProgress = back.arguments?.getBoolean("trackProgress") ?: true
-            val vm: ReaderViewModel = viewModel(
-                factory = ReaderViewModel.Factory(app.bookRepository, app.authPreferences, textProvider)
-            )
-            ReaderScreen(
-                bookId = bookId,
-                startPage = page,
-                trackProgress = trackProgress,
-                onBack = { navController.popBackStack() },
-                onOpenBook = ::openReaderBookFromBoundary,
-                onSetBookCover = { coverUri ->
-                    navController.navigate(Screen.Metadata.goBookCover(bookId, coverUri))
-                },
-                onSetSeriesCover = { coverUri ->
-                    val seriesId = vm.currentSeriesId
-                    if (seriesId.isNotBlank()) {
-                        navController.navigate(Screen.Metadata.goSeriesCover(seriesId, coverUri))
-                    }
-                },
-                vm = vm
-            )
-        }
+            composable(
+                Screen.Books.route,
+                arguments = listOf(navArgument("seriesId") { type = NavType.StringType })
+            ) { back ->
+                val seriesId = back.arguments?.getString("seriesId")?.let { Screen.decodeArg(it) } ?: return@composable
+                val vm: BookViewModel = viewModel(
+                    factory = BookViewModel.Factory(app.bookRepository, app.seriesRepository, imageCacheInvalidator, textProvider)
+                )
+                BookScreen(
+                    seriesId = seriesId, serverUrl = serverUrl,
+                    onBookClick = { id, name, pages, isOneShot ->
+                        navController.navigate(Screen.BookDetail.go(id, name, "", pages, isOneShot)) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onMetadataClick = { navController.navigate(Screen.Metadata.go("series", it)) },
+                    onBack = { navController.popBackStack() }, vm = vm
+                )
+            }
 
-        composable(
-            Screen.Metadata.route,
-            arguments = listOf(
-                navArgument("type") { type = NavType.StringType },
-                navArgument("id") { type = NavType.StringType },
-                navArgument("coverUri") { type = NavType.StringType; nullable = true; defaultValue = null },
-                navArgument("coverFocus") { type = NavType.BoolType; defaultValue = false }
-            )
-        ) { back ->
-            val type = back.arguments?.getString("type")?.let { Screen.decodeArg(it) } ?: return@composable
-            val id = back.arguments?.getString("id")?.let { Screen.decodeArg(it) } ?: return@composable
-            val coverUri = back.arguments?.getString("coverUri")?.let { Screen.decodeArg(it) }
-            val coverFocus = back.arguments?.getBoolean("coverFocus") ?: false
-            val vm: MetadataViewModel = viewModel(
-                factory = MetadataViewModel.Factory(app.bookRepository, imageCacheInvalidator)
-            )
-            MetadataScreen(
-                type = type,
-                id = id,
-                serverUrl = serverUrl,
-                coverUri = coverUri,
-                coverFocus = coverFocus,
-                onBack = { navController.popBackStack() },
-                vm = vm
-            )
-        }
+            composable(
+                Screen.BookDetail.route,
+                arguments = listOf(
+                    navArgument("bookId") { type = NavType.StringType },
+                    navArgument("bookName") { type = NavType.StringType },
+                    navArgument("seriesName") { type = NavType.StringType },
+                    navArgument("pageCount") { type = NavType.IntType },
+                    navArgument("isOneShot") { type = NavType.BoolType; defaultValue = false }
+                )
+            ) { back ->
+                val bookId = back.arguments?.getString("bookId")?.let { Screen.decodeArg(it) } ?: return@composable
+                val bookName = back.arguments?.getString("bookName")?.let { Screen.decodeArg(it) }.orEmpty()
+                val pageCount = back.arguments?.getInt("pageCount") ?: 0
+                val isOneShot = back.arguments?.getBoolean("isOneShot") ?: false
+                val vm: BookDetailViewModel = viewModel(
+                    factory = BookDetailViewModel.Factory(
+                        app.bookRepository,
+                        app.seriesRepository,
+                        imageCacheInvalidator,
+                        textProvider
+                    )
+                )
+                BookDetailScreen(
+                    bookId = bookId,
+                    bookName = bookName,
+                    pageCount = pageCount,
+                    isOneShot = isOneShot,
+                    onBack = {
+                        if (isOneShot) {
+                            val popped = navController.popBackStack(Screen.Series.route, inclusive = false)
+                            if (!popped) navController.popBackStack()
+                        } else {
+                            navController.popBackStack()
+                        }
+                    },
+                    onReadClick = { id, trackProgress ->
+                        val effectiveTrack = trackProgress && !alwaysIncognito
+                        val startPage = if (effectiveTrack) vm.book?.readProgress?.page ?: 1 else 1
+                        navController.navigate(Screen.Reader.go(id, startPage, effectiveTrack))
+                    },
+                    onMetadataClick = { navController.navigate(Screen.Metadata.go("book", it)) },
+                    onAuthorClick = { authorName, _ ->
+                        navController.navigate(Screen.Series.go(null, "author:$authorName"))
+                    },
+                    vm = vm,
+                    prefs = app.authPreferences
+                )
+            }
 
-        composable(Screen.Settings.route) {
-            SettingsScreen(onBack = { navController.popBackStack() }, prefs = app.authPreferences)
+            composable(
+                Screen.Reader.route,
+                arguments = listOf(
+                    navArgument("bookId") { type = NavType.StringType },
+                    navArgument("page") { type = NavType.IntType; defaultValue = 1 },
+                    navArgument("trackProgress") { type = NavType.BoolType; defaultValue = true }
+                ),
+                enterTransition = { fadeIn(tween(200)) },
+                exitTransition = { fadeOut(tween(150)) },
+                popEnterTransition = { fadeIn(tween(150)) },
+                popExitTransition = { fadeOut(tween(200)) }
+            ) { back ->
+                val bookId = back.arguments?.getString("bookId")?.let { Screen.decodeArg(it) } ?: return@composable
+                val page = back.arguments?.getInt("page") ?: 1
+                val trackProgress = back.arguments?.getBoolean("trackProgress") ?: true
+                val vm: ReaderViewModel = viewModel(
+                    factory = ReaderViewModel.Factory(app.bookRepository, app.authPreferences, textProvider)
+                )
+                ReaderScreen(
+                    bookId = bookId,
+                    startPage = page,
+                    trackProgress = trackProgress,
+                    onBack = { navController.popBackStack() },
+                    onOpenBook = ::openReaderBookFromBoundary,
+                    onSetBookCover = { coverUri ->
+                        navController.navigate(Screen.Metadata.goBookCover(bookId, coverUri))
+                    },
+                    onSetSeriesCover = { coverUri ->
+                        val seriesId = vm.currentSeriesId
+                        if (seriesId.isNotBlank()) {
+                            navController.navigate(Screen.Metadata.goSeriesCover(seriesId, coverUri))
+                        }
+                    },
+                    vm = vm
+                )
+            }
+
+            composable(
+                Screen.Metadata.route,
+                arguments = listOf(
+                    navArgument("type") { type = NavType.StringType },
+                    navArgument("id") { type = NavType.StringType },
+                    navArgument("coverUri") { type = NavType.StringType; nullable = true; defaultValue = null },
+                    navArgument("coverFocus") { type = NavType.BoolType; defaultValue = false }
+                )
+            ) { back ->
+                val type = back.arguments?.getString("type")?.let { Screen.decodeArg(it) } ?: return@composable
+                val id = back.arguments?.getString("id")?.let { Screen.decodeArg(it) } ?: return@composable
+                val coverUri = back.arguments?.getString("coverUri")?.let { Screen.decodeArg(it) }
+                val coverFocus = back.arguments?.getBoolean("coverFocus") ?: false
+                val vm: MetadataViewModel = viewModel(
+                    factory = MetadataViewModel.Factory(app.bookRepository, imageCacheInvalidator)
+                )
+                MetadataScreen(
+                    type = type,
+                    id = id,
+                    serverUrl = serverUrl,
+                    coverUri = coverUri,
+                    coverFocus = coverFocus,
+                    onBack = { navController.popBackStack() },
+                    vm = vm
+                )
+            }
+
+            composable(Screen.Settings.route) {
+                SettingsScreen(
+                    onBack = { navController.popBackStack() },
+                    prefs = app.authPreferences,
+                    preferencesManager = app.preferencesManager
+                )
+            }
         }
-    }
     }
 }
 
-// ... 后续的 TopLevelDestination、usesOverlayBottomBar、AdaptiveShell 保持不变（此处省略，按原有内容即可）
+private data class TopLevelDestination(
+    val route: String,
+    @StringRes val labelRes: Int,
+    val icon: ImageVector
+)
+
+private fun topLevelDestinations(isAdmin: Boolean): List<TopLevelDestination> =
+    buildList {
+        add(TopLevelDestination(Screen.Library.route, R.string.home, Icons.Default.Home))
+        add(TopLevelDestination(Screen.Browse.route, R.string.browse, Icons.Default.Search))
+        add(TopLevelDestination(Screen.Collections.route, R.string.collections, Icons.Default.CollectionsBookmark))
+        add(TopLevelDestination(Screen.ReadLists.route, R.string.read_lists, Icons.Default.FormatListBulleted))
+        if (isAdmin) add(TopLevelDestination(Screen.Admin.route, R.string.admin, Icons.Default.AdminPanelSettings))
+        add(TopLevelDestination(Screen.Settings.route, R.string.settings, Icons.Default.Settings))
+    }
+
+private fun usesOverlayBottomBar(route: String?): Boolean =
+    route == Screen.Library.route ||
+        route == Screen.Browse.route ||
+        route == Screen.Collections.route ||
+        route == Screen.ReadLists.route
+
+@Composable
+private fun AdaptiveShell(
+    destinations: List<TopLevelDestination>,
+    currentRoute: String?,
+    showTopLevelNav: Boolean,
+    bottomBarVisible: Boolean,
+    onDestinationClick: (TopLevelDestination) -> Unit,
+    content: @Composable (Modifier) -> Unit
+) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val useRail = maxWidth >= 720.dp
+        if (useRail) {
+            Row(Modifier.fillMaxSize()) {
+                AnimatedVisibility(visible = showTopLevelNav) {
+                    NavigationRail {
+                        destinations.forEach { destination ->
+                            val label = stringResource(destination.labelRes)
+                            NavigationRailItem(
+                                selected = currentRoute == destination.route,
+                                onClick = { onDestinationClick(destination) },
+                                icon = { Icon(destination.icon, contentDescription = label) },
+                                label = { Text(label) }
+                            )
+                        }
+                    }
+                }
+                Box(Modifier.weight(1f)) {
+                    content(Modifier.fillMaxSize())
+                }
+            }
+        } else {
+            Scaffold(
+                contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                bottomBar = {
+                    AnimatedVisibility(
+                        visible = showTopLevelNav && bottomBarVisible,
+                        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+                    ) {
+                        NavigationBar {
+                            destinations.forEach { destination ->
+                                val label = stringResource(destination.labelRes)
+                                NavigationBarItem(
+                                    selected = currentRoute == destination.route,
+                                    onClick = { onDestinationClick(destination) },
+                                    icon = { Icon(destination.icon, contentDescription = label) },
+                                    label = { Text(label) }
+                                )
+                            }
+                        }
+                    }
+                }
+            ) { padding ->
+                val layoutDirection = LocalLayoutDirection.current
+                val bottomPadding = if (usesOverlayBottomBar(currentRoute)) {
+                    0.dp
+                } else {
+                    padding.calculateBottomPadding()
+                }
+                content(
+                    Modifier.padding(
+                        start = padding.calculateStartPadding(layoutDirection),
+                        top = padding.calculateTopPadding(),
+                        end = padding.calculateEndPadding(layoutDirection),
+                        bottom = bottomPadding
+                    )
+                )
+            }
+        }
+    }
+}
