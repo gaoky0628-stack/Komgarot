@@ -401,4 +401,6 @@
     <string name="admin_duplicate_page_marked">Duplicate page marked</string>
     <string name="admin_duplicate_page_deleted">Duplicate page deleted</string>
     <string name="admin_task_queue_cleared">Task queue cleared</string>
+	<string name="settings_offline_mode">Offline mode</string>
+    <string name="settings_offline_mode_desc">Start app without login (requires online sync first)</string>
 </resources>
