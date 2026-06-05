@@ -30,6 +30,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.LocalNavController
+import androidx.navigation.compose.navigate
 import fail.tiger.komgarot.R
 import fail.tiger.komgarot.ThumbnailVersion
 import fail.tiger.komgarot.data.local.AuthPreferences
@@ -201,7 +202,7 @@ fun BookDetailScreen(
                             }
                         }
 
-                        // 可点击标签行（添加了 Spacer 修复间距）
+                        // 可点击标签行
                         if (!meta?.tags.isNullOrEmpty()) {
                             ClickableTagsRow(
                                 tags = meta!!.tags,
@@ -249,7 +250,7 @@ fun ClickableTagsRow(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Spacer(modifier = Modifier.height(4.dp))   // ✅ 修复间距
+        Spacer(modifier = Modifier.height(4.dp))
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {

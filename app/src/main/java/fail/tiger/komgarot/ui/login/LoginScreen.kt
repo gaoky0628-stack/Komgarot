@@ -11,22 +11,21 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.LocalNavController
+import androidx.navigation.compose.navigate
 import fail.tiger.komgarot.R
 import fail.tiger.komgarot.data.local.PreferencesManager
 import fail.tiger.komgarot.ui.navigation.Screen
 import kotlinx.coroutines.flow.collectAsState
-import kotlinx.coroutines.flow.first
-import androidx.navigation.compose.navigate
+
 @Composable
 fun LoginScreen(
     onSuccess: () -> Unit,
     vm: LoginViewModel,
-    preferencesManager: PreferencesManager   // 新增参数
+    preferencesManager: PreferencesManager
 ) {
     val navController = LocalNavController.current
     val offlineMode by preferencesManager.getOfflineModeFlow().collectAsState(initial = false)
 
-    // 离线模式下自动跳转到主页
     LaunchedEffect(offlineMode) {
         if (offlineMode) {
             navController.navigate(Screen.Library.route) {
