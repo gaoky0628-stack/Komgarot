@@ -1,14 +1,13 @@
-name: Build APK
+﻿name: Build APK
 
 on:
   push:
-    branches: [ "main" ]      # 当你推送到 main 分支时触发
-  workflow_dispatch:          # 也允许你手动触发（在 Actions 页面点按钮）
+    branches: [ "master" ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
