@@ -29,7 +29,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.navigation.NavController
 import androidx.navigation.compose.LocalNavController
 import fail.tiger.komgarot.R
 import fail.tiger.komgarot.ThumbnailVersion
@@ -41,6 +40,7 @@ import fail.tiger.komgarot.ui.components.ErrorState
 import fail.tiger.komgarot.ui.components.FloatingDetailActions
 import fail.tiger.komgarot.ui.components.FloatingDetailIconButton
 import fail.tiger.komgarot.ui.components.ImmersiveDetailScaffold
+import fail.tiger.komgarot.ui.navigation.Screen
 import java.net.URLEncoder
 import java.time.Instant
 import java.time.ZoneId
@@ -201,19 +201,17 @@ fun BookDetailScreen(
                             }
                         }
 
-                        // ✅ 替换原有的标签显示为可点击的标签行
+                        // 可点击标签行（添加了 Spacer 修复间距）
                         if (!meta?.tags.isNullOrEmpty()) {
                             ClickableTagsRow(
                                 tags = meta!!.tags,
                                 onTagClick = { tag ->
                                     if (tag.startsWith("http://") || tag.startsWith("https://")) {
-                                        // 超链接：用浏览器打开
                                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(tag))
                                         context.startActivity(intent)
                                     } else {
-                                        // 普通标签：跳转到搜索页并自动筛选
                                         val encodedTag = URLEncoder.encode(tag, "utf-8")
-                                        navController.navigate("search?tag=$encodedTag")
+                                        navController.navigate("series/all?search=tag:$encodedTag")
                                     }
                                 }
                             )
@@ -239,7 +237,6 @@ fun BookDetailScreen(
     }
 }
 
-// ✅ 新增的可点击标签行组件
 @Composable
 fun ClickableTagsRow(
     tags: List<String>,
@@ -252,6 +249,7 @@ fun ClickableTagsRow(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+        Spacer(modifier = Modifier.height(4.dp))   // ✅ 修复间距
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -266,7 +264,6 @@ fun ClickableTagsRow(
     }
 }
 
-// 其余原有函数保持不变（BookDetailReadingActions, BookDetailReadStatusActions, InfoRow, formatFileSize, formatDateTime, translateAuthorRole）
 @Composable
 private fun BookDetailReadingActions(
     hasReadProgress: Boolean,
