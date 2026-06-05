@@ -29,8 +29,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.navigation.compose.LocalNavController
-import androidx.navigation.compose.navigate
 import fail.tiger.komgarot.R
 import fail.tiger.komgarot.ThumbnailVersion
 import fail.tiger.komgarot.data.local.AuthPreferences
@@ -41,7 +39,6 @@ import fail.tiger.komgarot.ui.components.ErrorState
 import fail.tiger.komgarot.ui.components.FloatingDetailActions
 import fail.tiger.komgarot.ui.components.FloatingDetailIconButton
 import fail.tiger.komgarot.ui.components.ImmersiveDetailScaffold
-import fail.tiger.komgarot.ui.navigation.Screen
 import java.net.URLEncoder
 import java.time.Instant
 import java.time.ZoneId
@@ -59,10 +56,10 @@ fun BookDetailScreen(
     onReadClick: (String, Boolean) -> Unit,
     onMetadataClick: (String) -> Unit,
     onAuthorClick: (String, String) -> Unit = { _, _ -> },
+    onTagClick: (String) -> Unit = {},   // 新增：标签点击回调，由父组件处理跳转
     vm: BookDetailViewModel,
     prefs: AuthPreferences
 ) {
-    val navController = LocalNavController.current
     val context = LocalContext.current
 
     LaunchedEffect(bookId) { vm.load(bookId) }
@@ -202,7 +199,7 @@ fun BookDetailScreen(
                             }
                         }
 
-                        // 可点击标签行
+                        // 可点击标签行（使用回调，不直接依赖导航）
                         if (!meta?.tags.isNullOrEmpty()) {
                             ClickableTagsRow(
                                 tags = meta!!.tags,
@@ -211,8 +208,7 @@ fun BookDetailScreen(
                                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(tag))
                                         context.startActivity(intent)
                                     } else {
-                                        val encodedTag = URLEncoder.encode(tag, "utf-8")
-                                        navController.navigate("series/all?search=tag:$encodedTag")
+                                        onTagClick(tag)
                                     }
                                 }
                             )

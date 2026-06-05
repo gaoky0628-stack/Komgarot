@@ -10,30 +10,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.navigation.compose.LocalNavController
-import androidx.navigation.compose.navigate
 import fail.tiger.komgarot.R
 import fail.tiger.komgarot.data.local.PreferencesManager
-import fail.tiger.komgarot.ui.navigation.Screen
-import kotlinx.coroutines.flow.collectAsState
 
 @Composable
 fun LoginScreen(
     onSuccess: () -> Unit,
     vm: LoginViewModel,
-    preferencesManager: PreferencesManager
+    preferencesManager: PreferencesManager   // 保留参数，暂不使用（未来可扩展）
 ) {
-    val navController = LocalNavController.current
-    val offlineMode by preferencesManager.getOfflineModeFlow().collectAsState(initial = false)
-
-    LaunchedEffect(offlineMode) {
-        if (offlineMode) {
-            navController.navigate(Screen.Library.route) {
-                popUpTo(Screen.Login.route) { inclusive = true }
-            }
-        }
-    }
-
     val state by vm.state.collectAsState()
     var url by remember { mutableStateOf("") }
     var username by remember { mutableStateOf("") }
