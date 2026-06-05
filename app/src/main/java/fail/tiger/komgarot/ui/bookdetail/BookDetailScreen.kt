@@ -1,8 +1,15 @@
 package fail.tiger.komgarot.ui.bookdetail
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Undo
@@ -22,6 +29,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
+import androidx.navigation.compose.LocalNavController
 import fail.tiger.komgarot.R
 import fail.tiger.komgarot.ThumbnailVersion
 import fail.tiger.komgarot.data.local.AuthPreferences
@@ -32,6 +41,7 @@ import fail.tiger.komgarot.ui.components.ErrorState
 import fail.tiger.komgarot.ui.components.FloatingDetailActions
 import fail.tiger.komgarot.ui.components.FloatingDetailIconButton
 import fail.tiger.komgarot.ui.components.ImmersiveDetailScaffold
+import java.net.URLEncoder
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -51,6 +61,9 @@ fun BookDetailScreen(
     vm: BookDetailViewModel,
     prefs: AuthPreferences
 ) {
+    val navController = LocalNavController.current
+    val context = LocalContext.current
+
     LaunchedEffect(bookId) { vm.load(bookId) }
     val book = vm.book
     val meta = vm.metadata
@@ -87,8 +100,7 @@ fun BookDetailScreen(
             if (book == null && !vm.loading && vm.error != null) {
                 ErrorState(message = vm.error ?: loadBookDetailFailed, onRetry = { vm.load(bookId) })
             } else {
-                val context = LocalContext.current
-                val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                 ImmersiveDetailScaffold(
                     backgroundImageUrl = thumbnailUrl,
                     backgroundImageCacheKey = thumbnailCacheKey(ThumbnailCacheTarget.Book(bookId)),
@@ -150,7 +162,7 @@ fun BookDetailScreen(
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.clickable {
-                                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("id", bookId))
+                                clipboard.setPrimaryClip(ClipData.newPlainText("id", bookId))
                                 android.widget.Toast.makeText(context, copied, android.widget.Toast.LENGTH_SHORT).show()
                             }
                         )
@@ -189,8 +201,22 @@ fun BookDetailScreen(
                             }
                         }
 
+                        // ✅ 替换原有的标签显示为可点击的标签行
                         if (!meta?.tags.isNullOrEmpty()) {
-                            InfoRow(stringResource(R.string.tags, "").dropLast(2), meta!!.tags.joinToString(", "))
+                            ClickableTagsRow(
+                                tags = meta!!.tags,
+                                onTagClick = { tag ->
+                                    if (tag.startsWith("http://") || tag.startsWith("https://")) {
+                                        // 超链接：用浏览器打开
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(tag))
+                                        context.startActivity(intent)
+                                    } else {
+                                        // 普通标签：跳转到搜索页并自动筛选
+                                        val encodedTag = URLEncoder.encode(tag, "utf-8")
+                                        navController.navigate("search?tag=$encodedTag")
+                                    }
+                                }
+                            )
                         }
 
                         HorizontalDivider()
@@ -213,6 +239,34 @@ fun BookDetailScreen(
     }
 }
 
+// ✅ 新增的可点击标签行组件
+@Composable
+fun ClickableTagsRow(
+    tags: List<String>,
+    onTagClick: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = stringResource(R.string.tags),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(tags) { tag ->
+                AssistChip(
+                    onClick = { onTagClick(tag) },
+                    label = { Text(tag) },
+                    shape = MaterialTheme.shapes.small
+                )
+            }
+        }
+    }
+}
+
+// 其余原有函数保持不变（BookDetailReadingActions, BookDetailReadStatusActions, InfoRow, formatFileSize, formatDateTime, translateAuthorRole）
 @Composable
 private fun BookDetailReadingActions(
     hasReadProgress: Boolean,
@@ -323,7 +377,7 @@ private fun formatDateTime(dateTime: String): String {
     }
 }
 
-private fun translateAuthorRole(context: android.content.Context, role: String): String {
+private fun translateAuthorRole(context: Context, role: String): String {
     return when (role.lowercase()) {
         "writer" -> context.getString(R.string.author_role_writer)
         "penciller" -> context.getString(R.string.author_role_penciller)
