@@ -6,6 +6,7 @@ import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import fail.tiger.komgarot.data.local.AuthPreferences
+import fail.tiger.komgarot.data.local.PreferencesManager   // 新增导入
 import fail.tiger.komgarot.data.remote.AuthInterceptor
 import fail.tiger.komgarot.data.remote.ImageDownloadProgressInterceptor
 import fail.tiger.komgarot.data.remote.KomgaApi
@@ -29,6 +30,7 @@ private const val RETROFIT_PLACEHOLDER_BASE_URL = "https://komgarot.invalid/"
 
 class KomgarotApp : Application(), ImageLoaderFactory {
     lateinit var authPreferences: AuthPreferences
+    lateinit var preferencesManager: PreferencesManager   // 新增属性
     lateinit var okHttpClient: OkHttpClient
     lateinit var authRepository: AuthRepository
     lateinit var libraryRepository: LibraryRepository
@@ -42,6 +44,7 @@ class KomgarotApp : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         authPreferences = AuthPreferences(this)
+        preferencesManager = PreferencesManager(applicationContext)   // 初始化
         val authInterceptor = AuthInterceptor(authPreferences)
         val urlInterceptor = UrlInterceptor(authPreferences)
         okHttpClient = OkHttpClient.Builder()
